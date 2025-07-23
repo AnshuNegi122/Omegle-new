@@ -331,12 +331,50 @@ document.addEventListener("DOMContentLoaded", () => {
       iceServers: state.iceServers,
     })
 
+    // CRITICAL: Handle incoming tracks BEFORE adding local tracks
+    state.peerConnection.ontrack = (event) => {
+      console.log("🎥 RECEIVED REMOTE TRACK:", event.track.kind)
+      console.log("🎥 Track readyState:", event.track.readyState)
+      console.log("🎥 Streams count:", event.streams.length)
+
+      if (event.streams && event.streams[0]) {
+        console.log("🎥 Setting remote video srcObject")
+        remoteVideo.srcObject = event.streams[0]
+
+        // Force the video to load and play
+        remoteVideo.load()
+
+        setTimeout(() => {
+          remoteVideo
+            .play()
+            .then(() => {
+              console.log("🎥 Remote video playing successfully!")
+              waitingMessage.style.display = "none"
+              state.isConnected = true
+              connectionStatus.textContent = "Connected - Video Active"
+              showNotification("Video connection established!", "success")
+            })
+            .catch((e) => {
+              console.error("🎥 Remote video play failed:", e)
+              // Try clicking to play (some browsers require user interaction)
+              remoteVideo.muted = true
+              remoteVideo.play().catch((e2) => console.error("🎥 Muted play also failed:", e2))
+            })
+        }, 500)
+      } else {
+        console.error("🎥 No streams in track event!")
+      }
+    }
+
     // Add local stream tracks to the connection
     if (state.localStream) {
+      console.log("📤 Adding local tracks to peer connection")
       state.localStream.getTracks().forEach((track) => {
-        console.log("Adding local track:", track.kind)
+        console.log("📤 Adding local track:", track.kind, "enabled:", track.enabled)
         state.peerConnection.addTrack(track, state.localStream)
       })
+    } else {
+      console.error("❌ No local stream available!")
     }
 
     // Set up data channel for text chat
@@ -345,102 +383,64 @@ document.addEventListener("DOMContentLoaded", () => {
     // Handle ICE candidates
     state.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log("Sending ICE candidate")
+        console.log("🧊 Sending ICE candidate")
         state.socket.emit("ice-candidate", {
           to: state.remoteUserId,
           candidate: event.candidate,
         })
       } else {
-        console.log("ICE gathering complete")
+        console.log("🧊 ICE gathering complete")
       }
     }
 
     // Handle connection state changes
     state.peerConnection.onconnectionstatechange = () => {
-      console.log("Connection state:", state.peerConnection.connectionState)
+      console.log("🔗 Connection state:", state.peerConnection.connectionState)
 
       if (state.peerConnection.connectionState === "connected") {
-        console.log("Peer connection established successfully!")
-        connectionStatus.textContent = "Connected"
+        console.log("🔗 Peer connection established!")
 
-        // Double-check that we have the remote stream
-        const remoteStream = remoteVideo.srcObject
-        if (!remoteStream) {
-          console.log("No remote stream found, checking peer connection...")
-          // Try to get the remote stream from the peer connection
-          const receivers = state.peerConnection.getReceivers()
-          receivers.forEach((receiver) => {
-            if (receiver.track && receiver.track.kind === "video") {
-              console.log("Found video track in receiver, creating stream...")
-              const stream = new MediaStream([receiver.track])
-              remoteVideo.srcObject = stream
-              waitingMessage.style.display = "none"
-              remoteVideo.play().catch((e) => console.log("Error playing recovered stream:", e))
+        // Debug: Check what tracks we have
+        const receivers = state.peerConnection.getReceivers()
+        console.log("📥 Receivers:", receivers.length)
+        receivers.forEach((receiver, index) => {
+          if (receiver.track) {
+            console.log(`📥 Receiver ${index}:`, receiver.track.kind, "readyState:", receiver.track.readyState)
+          }
+        })
+
+        // If we still don't have video, try to manually set it
+        if (!remoteVideo.srcObject) {
+          console.log("🔧 Attempting manual stream recovery...")
+          const videoReceiver = receivers.find((r) => r.track && r.track.kind === "video")
+          const audioReceiver = receivers.find((r) => r.track && r.track.kind === "audio")
+
+          if (videoReceiver && videoReceiver.track) {
+            const tracks = [videoReceiver.track]
+            if (audioReceiver && audioReceiver.track) {
+              tracks.push(audioReceiver.track)
             }
-          })
+
+            const manualStream = new MediaStream(tracks)
+            console.log("🔧 Created manual stream with", tracks.length, "tracks")
+            remoteVideo.srcObject = manualStream
+
+            remoteVideo
+              .play()
+              .then(() => {
+                console.log("🔧 Manual stream playing!")
+                waitingMessage.style.display = "none"
+                state.isConnected = true
+              })
+              .catch((e) => console.error("🔧 Manual stream play failed:", e))
+          }
         }
-      } else if (
-        state.peerConnection.connectionState === "disconnected" ||
-        state.peerConnection.connectionState === "failed"
-      ) {
-        console.log("Peer connection failed or disconnected")
-        handleDisconnection()
-      }
-    }
-
-    // Handle incoming tracks (remote video/audio) - IMPROVED VERSION
-    state.peerConnection.ontrack = (event) => {
-      console.log("Received remote track:", event.track.kind)
-      console.log("Remote streams:", event.streams)
-      console.log("Track readyState:", event.track.readyState)
-
-      if (event.streams && event.streams[0]) {
-        console.log("Setting remote video source")
-        const remoteStream = event.streams[0]
-
-        // Set the stream to the video element
-        remoteVideo.srcObject = remoteStream
-
-        // Hide waiting message
-        waitingMessage.style.display = "none"
-        state.isConnected = true
-
-        // Force video to play and handle any errors
-        remoteVideo
-          .play()
-          .then(() => {
-            console.log("Remote video started playing successfully")
-            connectionStatus.textContent = "Connected"
-          })
-          .catch((e) => {
-            console.log("Remote video autoplay failed, trying to play manually:", e)
-            // Try to play after a short delay
-            setTimeout(() => {
-              remoteVideo.play().catch((err) => console.log("Manual play also failed:", err))
-            }, 1000)
-          })
-
-        // Add event listeners to the remote video element
-        remoteVideo.addEventListener("loadedmetadata", () => {
-          console.log("Remote video metadata loaded")
-        })
-
-        remoteVideo.addEventListener("canplay", () => {
-          console.log("Remote video can start playing")
-        })
-
-        remoteVideo.addEventListener("playing", () => {
-          console.log("Remote video is now playing")
-          showNotification("Video connection established!", "success")
-        })
-      } else {
-        console.log("No remote stream received in track event")
       }
     }
 
     // Handle ICE connection state
     state.peerConnection.oniceconnectionstatechange = () => {
-      console.log("ICE connection state:", state.peerConnection.iceConnectionState)
+      console.log("🧊 ICE connection state:", state.peerConnection.iceConnectionState)
     }
   }
 
@@ -487,22 +487,29 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      console.log("Creating offer...")
+      console.log("📞 Creating offer...")
+
+      // Make sure we have local stream before creating offer
+      if (!state.localStream) {
+        console.error("❌ No local stream when creating offer!")
+        return
+      }
+
       const offer = await state.peerConnection.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
       })
 
-      console.log("Setting local description (offer)")
+      console.log("📞 Setting local description (offer)")
       await state.peerConnection.setLocalDescription(offer)
 
-      console.log("Sending offer to:", state.remoteUserId)
+      console.log("📞 Sending offer to:", state.remoteUserId)
       state.socket.emit("offer", {
         to: state.remoteUserId,
         offer: offer,
       })
     } catch (error) {
-      console.error("Error creating offer:", error)
+      console.error("📞 Error creating offer:", error)
       showNotification("Failed to establish connection.", "error")
     }
   }
