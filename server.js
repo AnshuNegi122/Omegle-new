@@ -242,12 +242,24 @@ io.on("connection", (socket) => {
     // Try to find a match
     findMatch(userId)
   })
+
+  socket.on("waiting-for-match", (data) => {
+    const userSocket = activeUsers.get(userId)
+    if (userSocket) {
+      userSocket.emit("waiting-status", {
+        message: `Waiting for a partner... (${waitingUsers.size} users online)`,
+      })
+    }
+  })
 })
 
 // Function to find a match for a user
 function findMatch(userId) {
+  console.log(`Finding match for ${userId}. Waiting users:`, Array.from(waitingUsers))
+
   // If user is no longer active or waiting, return
   if (!activeUsers.has(userId) || !waitingUsers.has(userId)) {
+    console.log(`User ${userId} is not active or not waiting`)
     return
   }
 
@@ -257,7 +269,10 @@ function findMatch(userId) {
     if (otherId === userId) continue
 
     // Check if users have blocked each other
-    if (blockedPairs.has(`${userId}:${otherId}`)) continue
+    if (blockedPairs.has(`${userId}:${otherId}`)) {
+      console.log(`Users ${userId} and ${otherId} have blocked each other`)
+      continue
+    }
 
     // Found a match
     const userSocket = activeUsers.get(userId)
@@ -275,9 +290,15 @@ function findMatch(userId) {
       userRooms.set(userId, roomId)
       userRooms.set(otherId, roomId)
 
-      // Notify both users
-      userSocket.emit("match-found", { peerId: otherId })
-      otherSocket.emit("match-found", { peerId: userId })
+      // Notify both users - the first user will initiate the call
+      userSocket.emit("match-found", {
+        peerId: otherId,
+        initiator: true,
+      })
+      otherSocket.emit("match-found", {
+        peerId: userId,
+        initiator: false,
+      })
 
       console.log(`Matched ${userId} with ${otherId} in room ${roomId}`)
 
@@ -287,7 +308,15 @@ function findMatch(userId) {
   }
 
   // If no match was found, the user remains in the waiting list
-  console.log(`No match found for ${userId}, still waiting`)
+  console.log(`No match found for ${userId}, still waiting. Total waiting: ${waitingUsers.size}`)
+
+  // Notify user they're still waiting
+  const userSocket = activeUsers.get(userId)
+  if (userSocket) {
+    userSocket.emit("waiting-for-match", {
+      waitingCount: waitingUsers.size,
+    })
+  }
 }
 
 // Basic function to check for inappropriate content

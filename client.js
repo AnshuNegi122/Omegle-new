@@ -93,6 +93,9 @@ document.addEventListener("DOMContentLoaded", () => {
     return
   }
 
+  // Import Socket.IO client
+  const io = require("socket.io-client")
+
   // Event Listeners
   guidelinesAgreement.addEventListener("change", () => {
     startButton.disabled = !guidelinesAgreement.checked
@@ -152,66 +155,132 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function connectToSignalingServer() {
-    // In a real application, you would connect to your Socket.IO server
-    // For this example, we'll simulate the connection
+    // Connect to the actual Socket.IO server
+    state.socket = io()
 
-    // Simulate socket connection
-    state.socket = {
-      emit: (event, data) => {
-        console.log(`Emitting ${event}:`, data)
-        // Simulate server response
-        setTimeout(() => {
-          switch (event) {
-            case "join":
-              simulateUserJoined()
-              break
-            case "offer":
-              // In a real app, this would be sent to the peer
-              break
-            case "answer":
-              // In a real app, this would be sent to the peer
-              break
-            case "ice-candidate":
-              // In a real app, this would be sent to the peer
-              break
-          }
-        }, 1000)
-      },
-      on: (event, callback) => {
-        console.log(`Registered listener for ${event}`)
-        // This would register real event listeners in a real app
-      },
-    }
+    // Handle connection events
+    state.socket.on("connect", () => {
+      console.log("Connected to server")
+      connectionStatus.textContent = "Connected to server"
 
-    // Join the chat room
-    state.socket.emit("join", {
-      userId: state.userId,
-      displayName: state.displayName,
+      // Join the chat room
+      state.socket.emit("join", {
+        userId: state.userId,
+        displayName: state.displayName,
+      })
+    })
+
+    state.socket.on("disconnect", () => {
+      console.log("Disconnected from server")
+      connectionStatus.textContent = "Disconnected"
+      showNotification("Disconnected from server", "error")
+    })
+
+    // Handle match found
+    state.socket.on("match-found", (data) => {
+      console.log("Match found:", data.peerId)
+      state.remoteUserId = data.peerId
+      connectionStatus.textContent = `Connecting to ${data.peerId}...`
+
+      // Create peer connection and make offer
+      createPeerConnection()
+      createOffer()
+    })
+
+    // Handle WebRTC signaling
+    state.socket.on("offer", async (data) => {
+      console.log("Received offer from:", data.from)
+      state.remoteUserId = data.from
+
+      if (!state.peerConnection) {
+        createPeerConnection()
+      }
+
+      try {
+        await state.peerConnection.setRemoteDescription(data.offer)
+        const answer = await state.peerConnection.createAnswer()
+        await state.peerConnection.setLocalDescription(answer)
+
+        state.socket.emit("answer", {
+          to: data.from,
+          answer: answer,
+        })
+      } catch (error) {
+        console.error("Error handling offer:", error)
+        showNotification("Failed to establish connection", "error")
+      }
+    })
+
+    state.socket.on("answer", async (data) => {
+      console.log("Received answer from:", data.from)
+
+      try {
+        await state.peerConnection.setRemoteDescription(data.answer)
+      } catch (error) {
+        console.error("Error handling answer:", error)
+      }
+    })
+
+    state.socket.on("ice-candidate", async (data) => {
+      console.log("Received ICE candidate from:", data.from)
+
+      try {
+        await state.peerConnection.addIceCandidate(data.candidate)
+      } catch (error) {
+        console.error("Error adding ICE candidate:", error)
+      }
+    })
+
+    // Handle peer disconnection
+    state.socket.on("peer-disconnected", () => {
+      console.log("Peer disconnected")
+      handleDisconnection()
+    })
+
+    state.socket.on("call-ended", () => {
+      console.log("Call ended by peer")
+      handleDisconnection()
+    })
+
+    // Handle chat messages
+    state.socket.on("chat-message", (data) => {
+      displayChatMessage(
+        {
+          content: data.message.content,
+          sender: data.from,
+          timestamp: data.message.timestamp,
+        },
+        false,
+      )
+    })
+
+    // Add these event handlers inside the connectToSignalingServer() function, after the existing ones:
+
+    state.socket.on("waiting-for-match", (data) => {
+      connectionStatus.textContent = `Looking for a partner... (${data.waitingCount} users online)`
+    })
+
+    state.socket.on("waiting-status", (data) => {
+      waitingMessage.textContent = data.message
+      showNotification(data.message, "info")
+    })
+
+    // Handle message blocking
+    state.socket.on("message-blocked", (data) => {
+      showNotification(`Message blocked: ${data.reason}`, "warning")
+    })
+
+    // Handle report confirmation
+    state.socket.on("report-received", () => {
+      showNotification("Report submitted successfully", "success")
+    })
+
+    // Handle block confirmation
+    state.socket.on("user-blocked", () => {
+      showNotification("User has been blocked", "success")
     })
 
     connectionStatus.textContent = "Looking for a partner..."
-  }
-
-  function simulateUserJoined() {
-    // This simulates another user joining
-    // In a real app, this would be triggered by a socket event
-
-    state.remoteUserId = "simulated-user-" + Math.random().toString(36).substring(2, 7)
-
-    // Create peer connection
-    createPeerConnection()
-
-    // Create offer (as if we're the initiator)
-    createOffer()
-
-    // Update UI
-    waitingMessage.textContent = "Connected! Starting video..."
-    connectionStatus.textContent = "Connected"
-
-    // Simulate remote video after a delay
-    setTimeout(() => {
-      simulateRemoteVideo()
-    }, 2000)
   }
 
   function createPeerConnection() {
@@ -314,54 +383,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function simulateRemoteVideo() {
-    // This simulates receiving a remote video stream
-    // In a real app, this would come from the peer connection
-
-    // Create a video element to simulate remote video
-    const canvas = document.createElement("canvas")
-    canvas.width = 640
-    canvas.height = 480
-
-    const ctx = canvas.getContext("2d")
-    ctx.fillStyle = "#333"
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.font = "24px Arial"
-    ctx.fillStyle = "white"
-    ctx.textAlign = "center"
-    ctx.fillText("Simulated Remote User", canvas.width / 2, canvas.height / 2)
-
-    // Convert canvas to media stream
-    const stream = canvas.captureStream(30) // 30 FPS
-
-    // Add audio track (silent)
-    const audioContext = new AudioContext()
-    const oscillator = audioContext.createOscillator()
-    const dst = oscillator.connect(audioContext.createMediaStreamDestination())
-    oscillator.start()
-    const audioTrack = dst.stream.getAudioTracks()[0]
-    stream.addTrack(audioTrack)
-
-    // Set as remote stream
-    remoteVideo.srcObject = stream
-    waitingMessage.style.display = "none"
-    state.isConnected = true
-
-    // Update UI
-    connectionStatus.textContent = "Connected to User123"
-    showNotification("Connected to a chat partner!", "success")
-
-    // Simulate receiving a welcome message
-    setTimeout(() => {
-      const welcomeMessage = {
-        content: "Hello! How are you today?",
-        sender: "User123",
-        timestamp: Date.now(),
-      }
-      displayChatMessage(welcomeMessage, false)
-    }, 3000)
-  }
-
   function sendChatMessage() {
     const content = messageInput.value.trim()
 
@@ -390,19 +411,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // Clear input
     messageInput.value = ""
 
-    // Send via data channel
-    if (state.dataChannel && state.dataChannel.readyState === "open") {
-      state.dataChannel.send(JSON.stringify(message))
-    } else {
-      // In our simulation, we'll just simulate receiving a response
-      setTimeout(() => {
-        const response = {
-          content: "I received your message: " + message.content,
-          sender: "User123",
-          timestamp: Date.now(),
-        }
-        displayChatMessage(response, false)
-      }, 2000)
+    // Send via Socket.IO to the server
+    if (state.socket && state.remoteUserId) {
+      state.socket.emit("chat-message", {
+        to: state.remoteUserId,
+        message: message,
+      })
     }
   }
 
@@ -478,20 +492,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Reset waiting message
     waitingMessage.textContent = "Waiting for someone to connect..."
+    waitingMessage.style.display = "flex"
     connectionStatus.textContent = "Looking for a partner..."
 
-    // Join a new chat
-    state.socket.emit("join", {
-      userId: state.userId,
-      displayName: state.displayName,
-    })
+    // Request new chat from server
+    if (state.socket) {
+      state.socket.emit("find-new-chat")
+    }
 
     showNotification("Looking for a new chat partner...", "info")
-
-    // Simulate finding a new partner
-    setTimeout(() => {
-      simulateUserJoined()
-    }, 3000)
   }
 
   function handleDisconnection() {
@@ -518,14 +527,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const reason = document.getElementById("report-reason").value
     const details = document.getElementById("report-details").value
 
-    // In a real app, send this report to your server
-    console.log("Report submitted:", { reason, details, reportedUser: state.remoteUserId })
+    // Send report to server
+    if (state.socket && state.remoteUserId) {
+      state.socket.emit("report-user", {
+        userId: state.remoteUserId,
+        reason: reason,
+        details: details,
+      })
+    }
 
     // Hide modal
     hideReportModal()
-
-    // Show confirmation
-    showNotification("Report submitted. Thank you for helping keep our community safe.", "success")
 
     // End the call
     endCall()
@@ -537,7 +549,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return
     }
 
-    // Add user to blocked list
+    // Send block request to server
+    if (state.socket) {
+      state.socket.emit("block-user", {
+        userId: state.remoteUserId,
+      })
+    }
+
+    // Add user to local blocked list
     state.blockedUsers.add(state.remoteUserId)
 
     showNotification("User blocked. You will not be matched with them again.", "success")
