@@ -144,6 +144,7 @@ body {
   max-width: 90vw;
   right: 1rem;
   top: 1rem;
+  z-index: 10;
 }
 
 @media (min-width: 640px) {
