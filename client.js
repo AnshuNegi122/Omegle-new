@@ -493,9 +493,30 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function displayChatMessage(message, isSent) {
-    const messageElement = createMessageElement(message, isSent)
+    const messageElement = document.createElement("div")
+    messageElement.classList.add("message", isSent ? "sent" : "received")
+
+    const messageContent = document.createElement("p")
+    messageContent.textContent = message.content
+    messageContent.style.margin = "0"
+    messageElement.appendChild(messageContent)
+
+    const timestamp = document.createElement("span")
+    timestamp.classList.add("timestamp")
+    timestamp.textContent = new Date(message.timestamp).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+    messageElement.appendChild(timestamp)
+
     messagesContainer.appendChild(messageElement)
     messagesContainer.scrollTop = messagesContainer.scrollHeight
+
+    // Auto-show chat on mobile when receiving messages
+    if (window.innerWidth < 1024 && !isSent && !chatSidebar.classList.contains("show")) {
+      // Show a brief notification that there's a new message
+      showNotification("New message received", "info")
+    }
   }
 
   function toggleVideo() {
@@ -636,4 +657,104 @@ document.addEventListener("DOMContentLoaded", () => {
     // End the call
     endCall()
   }
+
+  // Mobile-specific elements
+  const toggleChatButton = document.getElementById("toggle-chat")
+  const closeChatButton = document.getElementById("close-chat")
+  const chatSidebar = document.getElementById("chat-sidebar")
+  const reportUserMobileButton = document.getElementById("report-user-mobile")
+  const blockUserMobileButton = document.getElementById("block-user-mobile")
+
+  // Mobile chat toggle functionality
+  if (toggleChatButton) {
+    toggleChatButton.addEventListener("click", () => {
+      chatSidebar.classList.remove("translate-x-full")
+      chatSidebar.classList.add("show")
+    })
+  }
+
+  if (closeChatButton) {
+    closeChatButton.addEventListener("click", () => {
+      chatSidebar.classList.add("translate-x-full")
+      chatSidebar.classList.remove("show")
+    })
+  }
+
+  // Mobile report and block buttons
+  if (reportUserMobileButton) {
+    reportUserMobileButton.addEventListener("click", showReportModal)
+  }
+
+  if (blockUserMobileButton) {
+    blockUserMobileButton.addEventListener("click", blockUser)
+  }
+
+  // Handle orientation changes
+  window.addEventListener("orientationchange", () => {
+    setTimeout(() => {
+      // Trigger a resize event to help video elements adjust
+      window.dispatchEvent(new Event("resize"))
+
+      // Ensure videos maintain proper aspect ratio
+      if (state.localStream && localVideo.srcObject) {
+        localVideo.style.objectFit = "cover"
+      }
+      if (remoteVideo.srcObject) {
+        remoteVideo.style.objectFit = "cover"
+      }
+    }, 100)
+  })
+
+  // Handle window resize
+  window.addEventListener("resize", () => {
+    // Close mobile chat sidebar on desktop resize
+    if (window.innerWidth >= 1024) {
+      chatSidebar.classList.remove("show")
+      chatSidebar.classList.add("translate-x-0")
+      chatSidebar.classList.remove("translate-x-full")
+    } else {
+      chatSidebar.classList.remove("translate-x-0")
+      if (!chatSidebar.classList.contains("show")) {
+        chatSidebar.classList.add("translate-x-full")
+      }
+    }
+  })
+
+  // Touch gesture handling for mobile
+  let touchStartX = 0
+  let touchStartY = 0
+
+  document.addEventListener(
+    "touchstart",
+    (e) => {
+      touchStartX = e.touches[0].clientX
+      touchStartY = e.touches[0].clientY
+    },
+    { passive: true },
+  )
+
+  document.addEventListener(
+    "touchend",
+    (e) => {
+      if (!touchStartX || !touchStartY) return
+
+      const touchEndX = e.changedTouches[0].clientX
+      const touchEndY = e.changedTouches[0].clientY
+
+      const deltaX = touchStartX - touchEndX
+      const deltaY = touchStartY - touchEndY
+
+      // Swipe right to close chat on mobile
+      if (Math.abs(deltaX) > Math.abs(deltaY) && deltaX < -50 && window.innerWidth < 1024) {
+        if (chatSidebar.classList.contains("show")) {
+          chatSidebar.classList.add("translate-x-full")
+          chatSidebar.classList.remove("show")
+        }
+      }
+
+      touchStartX = 0
+      touchStartY = 0
+    },
+    { passive: true },
+  )
 })
