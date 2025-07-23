@@ -1,342 +1,611 @@
-/**
- * Server for Safe Video Chat application
- *
- * This is a Node.js server using Express and Socket.IO to handle
- * WebRTC signaling for the video chat application.
- */
-
-const express = require("express")
-const http = require("http")
-const { Server } = require("socket.io")
-const path = require("path")
-
-// Create Express app
-const app = express()
-const server = http.createServer(app)
-const io = new Server(server)
-
-// Serve static files
-app.use(express.static(path.join(__dirname, "/")))
-
-// Serve index.html for root path
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"))
-})
-
-// Store active users and waiting users
-const activeUsers = new Map() // userId -> socket
-const waitingUsers = new Set() // Set of userIds waiting for a match
-const userRooms = new Map() // userId -> roomId
-const blockedPairs = new Set() // Set of "userId1:userId2" strings
-
-// Handle socket connections
-io.on("connection", (socket) => {
-  console.log("New connection:", socket.id)
-
-  let userId = null
-  let displayName = null
-
-  // Handle user joining
-  socket.on("join", (data) => {
-    userId = data.userId
-    displayName = data.displayName || "Anonymous"
-
-    console.log(`User ${userId} (${displayName}) joined`)
-
-    // Store user
-    activeUsers.set(userId, socket)
-
-    // Add to waiting list
-    waitingUsers.add(userId)
-
-    // Try to find a match
-    findMatch(userId)
-  })
-
-  // Handle WebRTC signaling
-  socket.on("offer", (data) => {
-    const targetSocket = activeUsers.get(data.to)
-    if (targetSocket) {
-      targetSocket.emit("offer", {
-        from: userId,
-        offer: data.offer,
-      })
+document.addEventListener("DOMContentLoaded", () => {
+  // Wait for button state manager to initialize
+  setTimeout(() => {
+    if (window.buttonStateManager && !window.buttonStateManager.initialized) {
+      window.buttonStateManager.init()
     }
-  })
+  }, 100)
+  // DOM Elements
+  const welcomeScreen = document.getElementById("welcome-screen")
+  const chatInterface = document.getElementById("chat-interface")
+  const startButton = document.getElementById("start-button")
+  const guidelinesAgreement = document.getElementById("guidelines-agreement")
+  const displayNameInput = document.getElementById("display-name")
+  const connectionStatus = document.getElementById("connection-status")
+  const localVideo = document.getElementById("local-video")
+  const remoteVideo = document.getElementById("remote-video")
+  const waitingMessage = document.getElementById("waiting-message")
+  const toggleVideoButton = document.getElementById("toggle-video")
+  const toggleAudioButton = document.getElementById("toggle-audio")
+  const endCallButton = document.getElementById("end-call")
+  const newChatButton = document.getElementById("new-chat-button")
+  const reportUserButton = document.getElementById("report-user")
+  const blockUserButton = document.getElementById("block-user")
+  const messageForm = document.getElementById("message-form")
+  const messageInput = document.getElementById("message-input")
+  const messagesContainer = document.getElementById("messages")
+  const reportModal = document.getElementById("report-modal")
+  const reportForm = document.getElementById("report-form")
+  const cancelReportButton = document.getElementById("cancel-report")
+  const closeNotificationButton = document.getElementById("close-notification")
 
-  socket.on("answer", (data) => {
-    const targetSocket = activeUsers.get(data.to)
-    if (targetSocket) {
-      targetSocket.emit("answer", {
-        from: userId,
-        answer: data.answer,
-      })
-    }
-  })
+  // Application state
+  const state = {
+    userId: generateUserId(),
+    displayName: "Anonymous",
+    socket: null,
+    localStream: null,
+    peerConnection: null,
+    remoteUserId: null,
+    isVideoEnabled: true,
+    isAudioEnabled: true,
+    blockedUsers: new Set(),
+    isConnected: false,
+    dataChannel: null,
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
+  }
 
-  socket.on("ice-candidate", (data) => {
-    const targetSocket = activeUsers.get(data.to)
-    if (targetSocket) {
-      targetSocket.emit("ice-candidate", {
-        from: userId,
-        candidate: data.candidate,
-      })
-    }
-  })
+  // Helper functions
+  function generateUserId() {
+    return "user-" + Math.random().toString(36).substring(2, 7)
+  }
 
-  // Handle chat messages
-  socket.on("chat-message", (data) => {
-    // Check if users are in the same room
-    const roomId = userRooms.get(userId)
-    const targetUserId = data.to
+  function isWebRTCSupported() {
+    return window.RTCPeerConnection && window.MediaStream
+  }
 
-    if (roomId && userRooms.get(targetUserId) === roomId) {
-      const targetSocket = activeUsers.get(targetUserId)
-      if (targetSocket) {
-        // Check for inappropriate content (basic implementation)
-        if (containsInappropriateContent(data.message.content)) {
-          // Notify sender that message was blocked
-          socket.emit("message-blocked", {
-            reason: "inappropriate-content",
-          })
+  function isGetUserMediaSupported() {
+    return navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+  }
 
-          // Log for moderation
-          logForModeration({
-            type: "blocked-message",
-            userId,
-            content: data.message.content,
-            timestamp: new Date(),
-          })
+  function showNotification(message, type) {
+    const notification = document.getElementById("notification")
+    notification.textContent = message
+    notification.classList.remove("hidden")
+    notification.classList.add(type)
+    setTimeout(() => {
+      notification.classList.add("hidden")
+    }, 5000)
+  }
 
-          return
-        }
+  function containsInappropriateContent(content) {
+    // Placeholder for inappropriate content check
+    return false
+  }
 
-        // Forward message
-        targetSocket.emit("chat-message", {
-          from: userId,
-          message: data.message,
-        })
-      }
-    }
-  })
+  function sanitizeInput(content) {
+    // Placeholder for input sanitization
+    return content
+  }
 
-  // Handle user reports
-  socket.on("report-user", (data) => {
-    const reportedUserId = data.userId
-    const reason = data.reason
-    const details = data.details
+  function createMessageElement(message, isSent) {
+    const messageElement = document.createElement("div")
+    messageElement.classList.add("message", isSent ? "sent" : "received")
+    messageElement.innerHTML = `
+            <strong>${message.sender}</strong>: ${message.content}
+            <span class="timestamp">${new Date(message.timestamp).toLocaleTimeString()}</span>
+        `
+    return messageElement
+  }
 
-    console.log(`User ${userId} reported ${reportedUserId} for ${reason}`)
-
-    // In a real app, store this report in a database for review
-    logForModeration({
-      type: "user-report",
-      reporterId: userId,
-      reportedId: reportedUserId,
-      reason,
-      details,
-      timestamp: new Date(),
-    })
-
-    // Acknowledge report
-    socket.emit("report-received")
-  })
-
-  // Handle user blocking
-  socket.on("block-user", (data) => {
-    const blockedUserId = data.userId
-
-    // Add to blocked pairs (both directions)
-    blockedPairs.add(`${userId}:${blockedUserId}`)
-    blockedPairs.add(`${blockedUserId}:${userId}`)
-
-    console.log(`User ${userId} blocked ${blockedUserId}`)
-
-    // Acknowledge block
-    socket.emit("user-blocked")
-  })
-
-  // Handle disconnection
-  socket.on("disconnect", () => {
-    if (userId) {
-      console.log(`User ${userId} disconnected`)
-
-      // Remove from active users
-      activeUsers.delete(userId)
-
-      // Remove from waiting users
-      waitingUsers.delete(userId)
-
-      // Notify peer if in a room
-      const roomId = userRooms.get(userId)
-      if (roomId) {
-        // Find the other user in the room
-        for (const [otherId, otherRoomId] of userRooms.entries()) {
-          if (otherId !== userId && otherRoomId === roomId) {
-            const otherSocket = activeUsers.get(otherId)
-            if (otherSocket) {
-              otherSocket.emit("peer-disconnected")
-            }
-            break
-          }
-        }
-
-        // Remove from room
-        userRooms.delete(userId)
-      }
-    }
-  })
-
-  // Handle explicit call end
-  socket.on("end-call", () => {
-    const roomId = userRooms.get(userId)
-    if (roomId) {
-      // Find the other user in the room
-      for (const [otherId, otherRoomId] of userRooms.entries()) {
-        if (otherId !== userId && otherRoomId === roomId) {
-          const otherSocket = activeUsers.get(otherId)
-          if (otherSocket) {
-            otherSocket.emit("call-ended")
-          }
-
-          // Remove other user from room
-          userRooms.delete(otherId)
-
-          // Add other user back to waiting if they want a new match
-          waitingUsers.add(otherId)
-          break
-        }
-      }
-
-      // Remove user from room
-      userRooms.delete(userId)
-    }
-  })
-
-  // Handle request for new chat
-  socket.on("find-new-chat", () => {
-    // End current call if any
-    const roomId = userRooms.get(userId)
-    if (roomId) {
-      // Find the other user in the room
-      for (const [otherId, otherRoomId] of userRooms.entries()) {
-        if (otherId !== userId && otherRoomId === roomId) {
-          const otherSocket = activeUsers.get(otherId)
-          if (otherSocket) {
-            otherSocket.emit("call-ended")
-          }
-
-          // Remove other user from room
-          userRooms.delete(otherId)
-          break
-        }
-      }
-
-      // Remove user from room
-      userRooms.delete(userId)
-    }
-
-    // Add to waiting list
-    waitingUsers.add(userId)
-
-    // Try to find a match
-    findMatch(userId)
-  })
-
-  socket.on("waiting-for-match", (data) => {
-    const userSocket = activeUsers.get(userId)
-    if (userSocket) {
-      userSocket.emit("waiting-status", {
-        message: `Waiting for a partner... (${waitingUsers.size} users online)`,
-      })
-    }
-  })
-})
-
-// Function to find a match for a user
-function findMatch(userId) {
-  console.log(`Finding match for ${userId}. Waiting users:`, Array.from(waitingUsers))
-
-  // If user is no longer active or waiting, return
-  if (!activeUsers.has(userId) || !waitingUsers.has(userId)) {
-    console.log(`User ${userId} is not active or not waiting`)
+  // Check browser support
+  if (!isWebRTCSupported() || !isGetUserMediaSupported()) {
+    showNotification(
+      "Your browser does not support video chat features. Please use a modern browser like Chrome, Firefox, or Safari.",
+      "error",
+    )
+    startButton.disabled = true
+    startButton.textContent = "Browser Not Supported"
     return
   }
 
-  // Find another waiting user
-  for (const otherId of waitingUsers) {
-    // Skip self
-    if (otherId === userId) continue
+  // Import Socket.IO client
+  const io = window.io // Declare the variable before using it
 
-    // Check if users have blocked each other
-    if (blockedPairs.has(`${userId}:${otherId}`)) {
-      console.log(`Users ${userId} and ${otherId} have blocked each other`)
-      continue
+  // Event Listeners with better debugging
+  guidelinesAgreement.addEventListener("change", (e) => {
+    console.log("Guidelines checkbox changed:", e.target.checked)
+    startButton.disabled = !e.target.checked
+
+    // Visual feedback
+    if (e.target.checked) {
+      startButton.classList.remove("bg-gray-300", "cursor-not-allowed")
+      startButton.classList.add("bg-blue-500", "hover:bg-blue-600")
+    } else {
+      startButton.classList.add("bg-gray-300", "cursor-not-allowed")
+      startButton.classList.remove("bg-blue-500", "hover:bg-blue-600")
+    }
+  })
+
+  // Add page load state restoration
+  window.addEventListener("load", () => {
+    // Restore checkbox state if user refreshes page
+    const savedAgreement = localStorage.getItem("guidelines-agreed")
+    if (savedAgreement === "true") {
+      guidelinesAgreement.checked = true
+      startButton.disabled = false
+      startButton.classList.remove("bg-gray-300", "cursor-not-allowed")
+      startButton.classList.add("bg-blue-500", "hover:bg-blue-600")
+    }
+  })
+
+  // Save agreement state when checkbox changes
+  guidelinesAgreement.addEventListener("change", (e) => {
+    localStorage.setItem("guidelines-agreed", e.target.checked.toString())
+  })
+
+  startButton.addEventListener("click", startChat)
+  endCallButton.addEventListener("click", endCall)
+  newChatButton.addEventListener("click", findNewChat)
+  toggleVideoButton.addEventListener("click", toggleVideo)
+  toggleAudioButton.addEventListener("click", toggleAudio)
+  reportUserButton.addEventListener("click", showReportModal)
+  blockUserButton.addEventListener("click", blockUser)
+  cancelReportButton.addEventListener("click", hideReportModal)
+  closeNotificationButton.addEventListener("click", () => {
+    document.getElementById("notification").classList.add("hidden")
+  })
+
+  messageForm.addEventListener("submit", (e) => {
+    e.preventDefault()
+    sendChatMessage()
+  })
+
+  reportForm.addEventListener("submit", (e) => {
+    e.preventDefault()
+    submitReport()
+  })
+
+  // Functions
+  async function startChat() {
+    console.log("Start chat button clicked")
+
+    try {
+      state.displayName = displayNameInput.value.trim() || "Anonymous"
+      console.log("Display name set to:", state.displayName)
+
+      // Get user media
+      console.log("Requesting user media...")
+      state.localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      })
+      console.log("User media obtained successfully")
+
+      // Display local video
+      localVideo.srcObject = state.localStream
+
+      // Connect to signaling server
+      console.log("Connecting to signaling server...")
+      connectToSignalingServer()
+
+      // Switch to chat interface
+      welcomeScreen.classList.add("hidden")
+      chatInterface.classList.remove("hidden")
+
+      showNotification("Connected to server. Waiting for a chat partner...", "success")
+    } catch (error) {
+      console.error("Error starting chat:", error)
+      showNotification(
+        "Failed to access camera and microphone. Please ensure you have granted the necessary permissions.",
+        "error",
+      )
+    }
+  }
+
+  function connectToSignalingServer() {
+    // Connect to the actual Socket.IO server (io is available globally)
+    state.socket = io()
+
+    // Handle connection events
+    state.socket.on("connect", () => {
+      console.log("Connected to server")
+      connectionStatus.textContent = "Connected to server"
+
+      // Join the chat room
+      state.socket.emit("join", {
+        userId: state.userId,
+        displayName: state.displayName,
+      })
+    })
+
+    state.socket.on("disconnect", () => {
+      console.log("Disconnected from server")
+      connectionStatus.textContent = "Disconnected"
+      showNotification("Disconnected from server", "error")
+    })
+
+    // Handle match found
+    state.socket.on("match-found", (data) => {
+      console.log("Match found:", data.peerId)
+      state.remoteUserId = data.peerId
+      connectionStatus.textContent = `Connecting to ${data.peerId}...`
+
+      // Create peer connection and make offer
+      createPeerConnection()
+      createOffer()
+    })
+
+    // Handle WebRTC signaling
+    state.socket.on("offer", async (data) => {
+      console.log("Received offer from:", data.from)
+      state.remoteUserId = data.from
+
+      if (!state.peerConnection) {
+        createPeerConnection()
+      }
+
+      try {
+        await state.peerConnection.setRemoteDescription(data.offer)
+        const answer = await state.peerConnection.createAnswer()
+        await state.peerConnection.setLocalDescription(answer)
+
+        state.socket.emit("answer", {
+          to: data.from,
+          answer: answer,
+        })
+      } catch (error) {
+        console.error("Error handling offer:", error)
+        showNotification("Failed to establish connection", "error")
+      }
+    })
+
+    state.socket.on("answer", async (data) => {
+      console.log("Received answer from:", data.from)
+
+      try {
+        await state.peerConnection.setRemoteDescription(data.answer)
+      } catch (error) {
+        console.error("Error handling answer:", error)
+      }
+    })
+
+    state.socket.on("ice-candidate", async (data) => {
+      console.log("Received ICE candidate from:", data.from)
+
+      try {
+        await state.peerConnection.addIceCandidate(data.candidate)
+      } catch (error) {
+        console.error("Error adding ICE candidate:", error)
+      }
+    })
+
+    // Handle peer disconnection
+    state.socket.on("peer-disconnected", () => {
+      console.log("Peer disconnected")
+      handleDisconnection()
+    })
+
+    state.socket.on("call-ended", () => {
+      console.log("Call ended by peer")
+      handleDisconnection()
+    })
+
+    // Handle chat messages
+    state.socket.on("chat-message", (data) => {
+      displayChatMessage(
+        {
+          content: data.message.content,
+          sender: data.from,
+          timestamp: data.message.timestamp,
+        },
+        false,
+      )
+    })
+
+    // Add these event handlers inside the connectToSignalingServer() function, after the existing ones:
+
+    state.socket.on("waiting-for-match", (data) => {
+      connectionStatus.textContent = `Looking for a partner... (${data.waitingCount} users online)`
+    })
+
+    state.socket.on("waiting-status", (data) => {
+      waitingMessage.textContent = data.message
+      showNotification(data.message, "info")
+    })
+
+    // Handle message blocking
+    state.socket.on("message-blocked", (data) => {
+      showNotification(`Message blocked: ${data.reason}`, "warning")
+    })
+
+    // Handle report confirmation
+    state.socket.on("report-received", () => {
+      showNotification("Report submitted successfully", "success")
+    })
+
+    // Handle block confirmation
+    state.socket.on("user-blocked", () => {
+      showNotification("User has been blocked", "success")
+    })
+
+    connectionStatus.textContent = "Looking for a partner..."
+  }
+
+  function createPeerConnection() {
+    // Create a new RTCPeerConnection
+    state.peerConnection = new RTCPeerConnection({
+      iceServers: state.iceServers,
+    })
+
+    // Add local stream tracks to the connection
+    state.localStream.getTracks().forEach((track) => {
+      state.peerConnection.addTrack(track, state.localStream)
+    })
+
+    // Set up data channel for text chat
+    setupDataChannel()
+
+    // Handle ICE candidates
+    state.peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        // In a real app, send this to the peer via signaling server
+        state.socket.emit("ice-candidate", {
+          to: state.remoteUserId,
+          candidate: event.candidate,
+        })
+      }
     }
 
-    // Found a match
-    const userSocket = activeUsers.get(userId)
-    const otherSocket = activeUsers.get(otherId)
+    // Handle connection state changes
+    state.peerConnection.onconnectionstatechange = () => {
+      console.log("Connection state:", state.peerConnection.connectionState)
 
-    if (userSocket && otherSocket) {
-      // Create a room
-      const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+      if (
+        state.peerConnection.connectionState === "disconnected" ||
+        state.peerConnection.connectionState === "failed"
+      ) {
+        handleDisconnection()
+      }
+    }
 
-      // Remove both users from waiting list
-      waitingUsers.delete(userId)
-      waitingUsers.delete(otherId)
+    // Handle incoming tracks (remote video/audio)
+    state.peerConnection.ontrack = (event) => {
+      if (remoteVideo.srcObject !== event.streams[0]) {
+        remoteVideo.srcObject = event.streams[0]
+        waitingMessage.style.display = "none"
+        state.isConnected = true
+        showNotification("Connected to a chat partner!", "success")
+      }
+    }
+  }
 
-      // Add both users to the room
-      userRooms.set(userId, roomId)
-      userRooms.set(otherId, roomId)
+  function setupDataChannel() {
+    // Create a data channel for text chat
+    state.dataChannel = state.peerConnection.createDataChannel("chat")
 
-      // Notify both users - the first user will initiate the call
-      userSocket.emit("match-found", {
-        peerId: otherId,
-        initiator: true,
+    state.dataChannel.onopen = () => {
+      console.log("Data channel is open")
+    }
+
+    state.dataChannel.onclose = () => {
+      console.log("Data channel is closed")
+    }
+
+    state.dataChannel.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data)
+        displayChatMessage(message, false)
+      } catch (error) {
+        console.error("Error parsing message:", error)
+      }
+    }
+
+    // Handle incoming data channels
+    state.peerConnection.ondatachannel = (event) => {
+      const receivedChannel = event.channel
+
+      receivedChannel.onmessage = (messageEvent) => {
+        try {
+          const message = JSON.parse(messageEvent.data)
+          displayChatMessage(message, false)
+        } catch (error) {
+          console.error("Error parsing message:", error)
+        }
+      }
+    }
+  }
+
+  async function createOffer() {
+    try {
+      const offer = await state.peerConnection.createOffer()
+      await state.peerConnection.setLocalDescription(offer)
+
+      // In a real app, send this offer to the peer via signaling server
+      state.socket.emit("offer", {
+        to: state.remoteUserId,
+        offer: offer,
       })
-      otherSocket.emit("match-found", {
-        peerId: userId,
-        initiator: false,
-      })
+    } catch (error) {
+      console.error("Error creating offer:", error)
+      showNotification("Failed to establish connection.", "error")
+    }
+  }
 
-      console.log(`Matched ${userId} with ${otherId} in room ${roomId}`)
+  function sendChatMessage() {
+    const content = messageInput.value.trim()
 
-      // Exit the function since we found a match
+    if (!content) return
+
+    // Check for inappropriate content
+    if (containsInappropriateContent(content)) {
+      showNotification(
+        "Your message may contain inappropriate content. Please review our community guidelines.",
+        "warning",
+      )
       return
     }
+
+    // Create message object
+    const message = {
+      content: sanitizeInput(content),
+      sender: state.userId,
+      displayName: state.displayName,
+      timestamp: Date.now(),
+    }
+
+    // Display message in UI
+    displayChatMessage(message, true)
+
+    // Clear input
+    messageInput.value = ""
+
+    // Send via Socket.IO to the server
+    if (state.socket && state.remoteUserId) {
+      state.socket.emit("chat-message", {
+        to: state.remoteUserId,
+        message: message,
+      })
+    }
   }
 
-  // If no match was found, the user remains in the waiting list
-  console.log(`No match found for ${userId}, still waiting. Total waiting: ${waitingUsers.size}`)
-
-  // Notify user they're still waiting
-  const userSocket = activeUsers.get(userId)
-  if (userSocket) {
-    userSocket.emit("waiting-for-match", {
-      waitingCount: waitingUsers.size,
-    })
+  function displayChatMessage(message, isSent) {
+    const messageElement = createMessageElement(message, isSent)
+    messagesContainer.appendChild(messageElement)
+    messagesContainer.scrollTop = messagesContainer.scrollHeight
   }
-}
 
-// Basic function to check for inappropriate content
-function containsInappropriateContent(text) {
-  // This is a very basic implementation
-  // In a real application, you would use more sophisticated methods
-  const inappropriateWords = ["inappropriate1", "inappropriate2", "slur1", "slur2"]
+  function toggleVideo() {
+    if (state.localStream) {
+      state.isVideoEnabled = !state.isVideoEnabled
 
-  const lowerText = text.toLowerCase()
-  return inappropriateWords.some((word) => lowerText.includes(word))
-}
+      state.localStream.getVideoTracks().forEach((track) => {
+        track.enabled = state.isVideoEnabled
+      })
 
-// Function to log moderation events
-function logForModeration(data) {
-  // In a real app, this would store data in a database
-  console.log("MODERATION LOG:", data)
-}
+      // Update button style
+      toggleVideoButton.classList.toggle("bg-red-600", !state.isVideoEnabled)
+      toggleVideoButton.classList.toggle("bg-gray-700", state.isVideoEnabled)
 
-// Start server
-const PORT = process.env.PORT || 3000
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
+      // Show notification
+      showNotification(state.isVideoEnabled ? "Video enabled" : "Video disabled", "info")
+    }
+  }
+
+  function toggleAudio() {
+    if (state.localStream) {
+      state.isAudioEnabled = !state.isAudioEnabled
+
+      state.localStream.getAudioTracks().forEach((track) => {
+        track.enabled = state.isAudioEnabled
+      })
+
+      // Update button style
+      toggleAudioButton.classList.toggle("bg-red-600", !state.isAudioEnabled)
+      toggleAudioButton.classList.toggle("bg-gray-700", state.isAudioEnabled)
+
+      // Show notification
+      showNotification(state.isAudioEnabled ? "Microphone enabled" : "Microphone muted", "info")
+    }
+  }
+
+  function endCall() {
+    // Close peer connection
+    if (state.peerConnection) {
+      state.peerConnection.close()
+      state.peerConnection = null
+    }
+
+    // Close data channel
+    if (state.dataChannel) {
+      state.dataChannel.close()
+      state.dataChannel = null
+    }
+
+    // Reset UI
+    remoteVideo.srcObject = null
+    waitingMessage.style.display = "flex"
+    waitingMessage.textContent = 'Call ended. Click "New Chat" to find another partner.'
+    connectionStatus.textContent = "Disconnected"
+    messagesContainer.innerHTML = ""
+
+    state.isConnected = false
+    state.remoteUserId = null
+
+    showNotification("Call ended", "info")
+  }
+
+  function findNewChat() {
+    // End current call
+    endCall()
+
+    // Reset waiting message
+    waitingMessage.textContent = "Waiting for someone to connect..."
+    waitingMessage.style.display = "flex"
+    connectionStatus.textContent = "Looking for a partner..."
+
+    // Request new chat from server
+    if (state.socket) {
+      state.socket.emit("find-new-chat")
+    }
+
+    showNotification("Looking for a new chat partner...", "info")
+  }
+
+  function handleDisconnection() {
+    if (state.isConnected) {
+      showNotification("Your chat partner disconnected", "warning")
+      endCall()
+    }
+  }
+
+  function showReportModal() {
+    if (!state.isConnected) {
+      showNotification("No user to report", "error")
+      return
+    }
+
+    reportModal.classList.remove("hidden")
+  }
+
+  function hideReportModal() {
+    reportModal.classList.add("hidden")
+  }
+
+  function submitReport() {
+    const reason = document.getElementById("report-reason").value
+    const details = document.getElementById("report-details").value
+
+    // Send report to server
+    if (state.socket && state.remoteUserId) {
+      state.socket.emit("report-user", {
+        userId: state.remoteUserId,
+        reason: reason,
+        details: details,
+      })
+    }
+
+    // Hide modal
+    hideReportModal()
+
+    // End the call
+    endCall()
+  }
+
+  function blockUser() {
+    if (!state.isConnected || !state.remoteUserId) {
+      showNotification("No user to block", "error")
+      return
+    }
+
+    // Send block request to server
+    if (state.socket) {
+      state.socket.emit("block-user", {
+        userId: state.remoteUserId,
+      })
+    }
+
+    // Add user to local blocked list
+    state.blockedUsers.add(state.remoteUserId)
+
+    showNotification("User blocked. You will not be matched with them again.", "success")
+
+    // End the call
+    endCall()
+  }
+  // Remove the old guidelines event listener since it's now handled by ButtonStateManager
+  // Comment out or remove this line:
+  // guidelinesAgreement.addEventListener("change", () => {
+  //   startButton.disabled = !guidelinesAgreement.checked
+  // })
 })

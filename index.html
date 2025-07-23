@@ -7,6 +7,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <link rel="stylesheet" href="styles.css">
+    <script>
+// Debug function to check initial state
+function debugInitialState() {
+  console.log("Page loaded, checking initial state...")
+  const checkbox = document.getElementById("guidelines-agreement")
+  const button = document.getElementById("start-button")
+  console.log("Checkbox checked:", checkbox?.checked)
+  console.log("Button disabled:", button?.disabled)
+}
+
+// Run debug on page load
+document.addEventListener("DOMContentLoaded", debugInitialState)
+</script>
 </head>
 <body class="bg-gray-100 h-screen">
     <div id="app" class="h-full flex flex-col">
@@ -32,11 +45,26 @@
                 </div>
                 
                 <div class="flex items-center mb-6">
-                    <input type="checkbox" id="guidelines-agreement" class="mr-2">
-                    <label for="guidelines-agreement" class="text-sm text-gray-600">I agree to follow the community guidelines</label>
+                  <input 
+                    type="checkbox" 
+                    id="guidelines-agreement" 
+                    class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    aria-describedby="guidelines-description"
+                  >
+                  <label for="guidelines-agreement" class="text-sm text-gray-600" id="guidelines-description">
+                    I agree to follow the community guidelines and terms of service
+                  </label>
                 </div>
                 
-                <button id="start-button" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>Start Chatting</button>
+                <button 
+                  id="start-button" 
+                  class="w-full py-2 px-4 rounded-md transition duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 enabled:bg-blue-500 enabled:text-white enabled:hover:bg-blue-600" 
+                  disabled
+                  aria-describedby="button-status"
+                >
+                  Start Chatting
+                </button>
+                <p id="button-status" class="text-xs text-gray-500 mt-1 hidden">Please accept the community guidelines to continue</p>
             </div>
         </div>
 
@@ -160,6 +188,7 @@
         </div>
     </div>
 
+    <script src="button-state-manager.js"></script>
     <script src="utils.js"></script>
     <script src="client.js"></script>
 </body>
