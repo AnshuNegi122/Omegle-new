@@ -194,13 +194,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Handle match found
     state.socket.on("match-found", (data) => {
-      console.log("Match found:", data.peerId)
+      console.log("Match found:", data.peerId, "Initiator:", data.initiator)
       state.remoteUserId = data.peerId
       connectionStatus.textContent = `Connecting to ${data.peerId}...`
 
-      // Create peer connection and make offer
+      // Create peer connection
       createPeerConnection()
-      createOffer()
+
+      // Only the initiator creates the offer
+      if (data.initiator) {
+        console.log("Creating offer as initiator")
+        setTimeout(() => createOffer(), 1000) // Small delay to ensure both peers are ready
+      } else {
+        console.log("Waiting for offer as non-initiator")
+      }
     })
 
     // Handle WebRTC signaling
@@ -209,14 +216,21 @@ document.addEventListener("DOMContentLoaded", () => {
       state.remoteUserId = data.from
 
       if (!state.peerConnection) {
+        console.log("Creating peer connection for incoming offer")
         createPeerConnection()
       }
 
       try {
-        await state.peerConnection.setRemoteDescription(data.offer)
+        console.log("Setting remote description (offer)")
+        await state.peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
+
+        console.log("Creating answer")
         const answer = await state.peerConnection.createAnswer()
+
+        console.log("Setting local description (answer)")
         await state.peerConnection.setLocalDescription(answer)
 
+        console.log("Sending answer")
         state.socket.emit("answer", {
           to: data.from,
           answer: answer,
@@ -231,7 +245,9 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("Received answer from:", data.from)
 
       try {
-        await state.peerConnection.setRemoteDescription(data.answer)
+        console.log("Setting remote description (answer)")
+        await state.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
+        console.log("Answer processed successfully")
       } catch (error) {
         console.error("Error handling answer:", error)
       }
@@ -240,10 +256,15 @@ document.addEventListener("DOMContentLoaded", () => {
     state.socket.on("ice-candidate", async (data) => {
       console.log("Received ICE candidate from:", data.from)
 
-      try {
-        await state.peerConnection.addIceCandidate(data.candidate)
-      } catch (error) {
-        console.error("Error adding ICE candidate:", error)
+      if (state.peerConnection && state.peerConnection.remoteDescription) {
+        try {
+          await state.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
+          console.log("ICE candidate added successfully")
+        } catch (error) {
+          console.error("Error adding ICE candidate:", error)
+        }
+      } else {
+        console.log("Peer connection not ready for ICE candidate")
       }
     })
 
@@ -300,15 +321,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function createPeerConnection() {
+    console.log("Creating peer connection...")
+
     // Create a new RTCPeerConnection
     state.peerConnection = new RTCPeerConnection({
       iceServers: state.iceServers,
     })
 
     // Add local stream tracks to the connection
-    state.localStream.getTracks().forEach((track) => {
-      state.peerConnection.addTrack(track, state.localStream)
-    })
+    if (state.localStream) {
+      state.localStream.getTracks().forEach((track) => {
+        console.log("Adding local track:", track.kind)
+        state.peerConnection.addTrack(track, state.localStream)
+      })
+    }
 
     // Set up data channel for text chat
     setupDataChannel()
@@ -316,11 +342,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // Handle ICE candidates
     state.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        // In a real app, send this to the peer via signaling server
+        console.log("Sending ICE candidate")
         state.socket.emit("ice-candidate", {
           to: state.remoteUserId,
           candidate: event.candidate,
         })
+      } else {
+        console.log("ICE gathering complete")
       }
     }
 
@@ -328,22 +356,39 @@ document.addEventListener("DOMContentLoaded", () => {
     state.peerConnection.onconnectionstatechange = () => {
       console.log("Connection state:", state.peerConnection.connectionState)
 
-      if (
+      if (state.peerConnection.connectionState === "connected") {
+        console.log("Peer connection established successfully!")
+        showNotification("Connected to chat partner!", "success")
+      } else if (
         state.peerConnection.connectionState === "disconnected" ||
         state.peerConnection.connectionState === "failed"
       ) {
+        console.log("Peer connection failed or disconnected")
         handleDisconnection()
       }
     }
 
-    // Handle incoming tracks (remote video/audio)
+    // Handle incoming tracks (remote video/audio) - THIS IS THE KEY FIX
     state.peerConnection.ontrack = (event) => {
-      if (remoteVideo.srcObject !== event.streams[0]) {
+      console.log("Received remote track:", event.track.kind)
+      console.log("Remote streams:", event.streams)
+
+      if (event.streams && event.streams[0]) {
+        console.log("Setting remote video source")
         remoteVideo.srcObject = event.streams[0]
         waitingMessage.style.display = "none"
         state.isConnected = true
-        showNotification("Connected to a chat partner!", "success")
+
+        // Ensure video plays
+        remoteVideo.play().catch((e) => {
+          console.log("Remote video autoplay failed:", e)
+        })
       }
+    }
+
+    // Handle ICE connection state
+    state.peerConnection.oniceconnectionstatechange = () => {
+      console.log("ICE connection state:", state.peerConnection.iceConnectionState)
     }
   }
 
@@ -384,11 +429,22 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function createOffer() {
+    if (!state.peerConnection) {
+      console.error("No peer connection available for creating offer")
+      return
+    }
+
     try {
-      const offer = await state.peerConnection.createOffer()
+      console.log("Creating offer...")
+      const offer = await state.peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      })
+
+      console.log("Setting local description (offer)")
       await state.peerConnection.setLocalDescription(offer)
 
-      // In a real app, send this offer to the peer via signaling server
+      console.log("Sending offer to:", state.remoteUserId)
       state.socket.emit("offer", {
         to: state.remoteUserId,
         offer: offer,

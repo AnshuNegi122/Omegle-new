@@ -55,32 +55,41 @@ io.on("connection", (socket) => {
 
   // Handle WebRTC signaling
   socket.on("offer", (data) => {
+    console.log(`Forwarding offer from ${userId} to ${data.to}`)
     const targetSocket = activeUsers.get(data.to)
     if (targetSocket) {
       targetSocket.emit("offer", {
         from: userId,
         offer: data.offer,
       })
+    } else {
+      console.log(`Target user ${data.to} not found for offer`)
     }
   })
 
   socket.on("answer", (data) => {
+    console.log(`Forwarding answer from ${userId} to ${data.to}`)
     const targetSocket = activeUsers.get(data.to)
     if (targetSocket) {
       targetSocket.emit("answer", {
         from: userId,
         answer: data.answer,
       })
+    } else {
+      console.log(`Target user ${data.to} not found for answer`)
     }
   })
 
   socket.on("ice-candidate", (data) => {
+    console.log(`Forwarding ICE candidate from ${userId} to ${data.to}`)
     const targetSocket = activeUsers.get(data.to)
     if (targetSocket) {
       targetSocket.emit("ice-candidate", {
         from: userId,
         candidate: data.candidate,
       })
+    } else {
+      console.log(`Target user ${data.to} not found for ICE candidate`)
     }
   })
 
