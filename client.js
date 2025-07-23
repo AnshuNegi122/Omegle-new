@@ -198,6 +198,9 @@ document.addEventListener("DOMContentLoaded", () => {
       state.remoteUserId = data.peerId
       connectionStatus.textContent = `Connecting to ${data.peerId}...`
 
+      // Hide waiting message temporarily
+      waitingMessage.textContent = "Establishing video connection..."
+
       // Create peer connection
       createPeerConnection()
 
@@ -358,7 +361,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (state.peerConnection.connectionState === "connected") {
         console.log("Peer connection established successfully!")
-        showNotification("Connected to chat partner!", "success")
+        connectionStatus.textContent = "Connected"
+
+        // Double-check that we have the remote stream
+        const remoteStream = remoteVideo.srcObject
+        if (!remoteStream) {
+          console.log("No remote stream found, checking peer connection...")
+          // Try to get the remote stream from the peer connection
+          const receivers = state.peerConnection.getReceivers()
+          receivers.forEach((receiver) => {
+            if (receiver.track && receiver.track.kind === "video") {
+              console.log("Found video track in receiver, creating stream...")
+              const stream = new MediaStream([receiver.track])
+              remoteVideo.srcObject = stream
+              waitingMessage.style.display = "none"
+              remoteVideo.play().catch((e) => console.log("Error playing recovered stream:", e))
+            }
+          })
+        }
       } else if (
         state.peerConnection.connectionState === "disconnected" ||
         state.peerConnection.connectionState === "failed"
@@ -368,21 +388,53 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // Handle incoming tracks (remote video/audio) - THIS IS THE KEY FIX
+    // Handle incoming tracks (remote video/audio) - IMPROVED VERSION
     state.peerConnection.ontrack = (event) => {
       console.log("Received remote track:", event.track.kind)
       console.log("Remote streams:", event.streams)
+      console.log("Track readyState:", event.track.readyState)
 
       if (event.streams && event.streams[0]) {
         console.log("Setting remote video source")
-        remoteVideo.srcObject = event.streams[0]
+        const remoteStream = event.streams[0]
+
+        // Set the stream to the video element
+        remoteVideo.srcObject = remoteStream
+
+        // Hide waiting message
         waitingMessage.style.display = "none"
         state.isConnected = true
 
-        // Ensure video plays
-        remoteVideo.play().catch((e) => {
-          console.log("Remote video autoplay failed:", e)
+        // Force video to play and handle any errors
+        remoteVideo
+          .play()
+          .then(() => {
+            console.log("Remote video started playing successfully")
+            connectionStatus.textContent = "Connected"
+          })
+          .catch((e) => {
+            console.log("Remote video autoplay failed, trying to play manually:", e)
+            // Try to play after a short delay
+            setTimeout(() => {
+              remoteVideo.play().catch((err) => console.log("Manual play also failed:", err))
+            }, 1000)
+          })
+
+        // Add event listeners to the remote video element
+        remoteVideo.addEventListener("loadedmetadata", () => {
+          console.log("Remote video metadata loaded")
         })
+
+        remoteVideo.addEventListener("canplay", () => {
+          console.log("Remote video can start playing")
+        })
+
+        remoteVideo.addEventListener("playing", () => {
+          console.log("Remote video is now playing")
+          showNotification("Video connection established!", "success")
+        })
+      } else {
+        console.log("No remote stream received in track event")
       }
     }
 
