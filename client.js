@@ -36,7 +36,29 @@ document.addEventListener("DOMContentLoaded", () => {
     blockedUsers: new Set(),
     isConnected: false,
     dataChannel: null,
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:stun2.l.google.com:19302" },
+      { urls: "stun:stun3.l.google.com:19302" },
+      { urls: "stun:stun4.l.google.com:19302" },
+      // Free TURN servers (these may have limitations)
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443?transport=tcp",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+    ],
   }
 
   // Helper functions
@@ -435,6 +457,22 @@ document.addEventListener("DOMContentLoaded", () => {
               .catch((e) => console.error("🔧 Manual stream play failed:", e))
           }
         }
+      } else if (state.peerConnection.connectionState === "failed") {
+        console.error("🔗 Connection failed - likely NAT/firewall issue")
+        showNotification("Connection failed. Trying to reconnect...", "warning")
+
+        // Try to restart ICE
+        state.peerConnection.restartIce()
+
+        // If that doesn't work, show helpful message
+        setTimeout(() => {
+          if (state.peerConnection.connectionState === "failed") {
+            showNotification("Connection failed. Both users may be behind strict firewalls.", "error")
+          }
+        }, 5000)
+      } else if (state.peerConnection.connectionState === "disconnected") {
+        console.log("🔗 Connection disconnected, waiting for reconnection...")
+        showNotification("Connection interrupted, attempting to reconnect...", "warning")
       }
     }
 
