@@ -93,12 +93,22 @@ document.addEventListener("DOMContentLoaded", () => {
     return
   }
 
-  // Import Socket.IO client
-  const io = require("socket.io-client")
+  // Socket.IO is available globally from the CDN
+  const io = window.io // Declare the io variable
 
-  // Event Listeners
-  guidelinesAgreement.addEventListener("change", () => {
-    startButton.disabled = !guidelinesAgreement.checked
+  // Event Listeners - Simple and working version
+  guidelinesAgreement.addEventListener("change", (e) => {
+    console.log("Guidelines checkbox changed:", e.target.checked)
+    startButton.disabled = !e.target.checked
+
+    // Visual feedback
+    if (e.target.checked) {
+      startButton.classList.remove("bg-gray-300", "cursor-not-allowed", "text-gray-500")
+      startButton.classList.add("bg-blue-500", "text-white", "hover:bg-blue-600")
+    } else {
+      startButton.classList.add("bg-gray-300", "cursor-not-allowed", "text-gray-500")
+      startButton.classList.remove("bg-blue-500", "text-white", "hover:bg-blue-600")
+    }
   })
 
   startButton.addEventListener("click", startChat)
@@ -125,19 +135,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Functions
   async function startChat() {
+    console.log("Start chat button clicked")
+
     try {
       state.displayName = displayNameInput.value.trim() || "Anonymous"
+      console.log("Display name set to:", state.displayName)
 
       // Get user media
+      console.log("Requesting user media...")
       state.localStream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true,
       })
+      console.log("User media obtained successfully")
 
       // Display local video
       localVideo.srcObject = state.localStream
 
       // Connect to signaling server
+      console.log("Connecting to signaling server...")
       connectToSignalingServer()
 
       // Switch to chat interface
@@ -155,7 +171,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function connectToSignalingServer() {
-    // Connect to the actual Socket.IO server
+    // Connect to the actual Socket.IO server (io is available globally)
     state.socket = io()
 
     // Handle connection events

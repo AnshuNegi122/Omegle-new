@@ -7,19 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <link rel="stylesheet" href="styles.css">
-    <script>
-// Debug function to check initial state
-function debugInitialState() {
-  console.log("Page loaded, checking initial state...")
-  const checkbox = document.getElementById("guidelines-agreement")
-  const button = document.getElementById("start-button")
-  console.log("Checkbox checked:", checkbox?.checked)
-  console.log("Button disabled:", button?.disabled)
-}
-
-// Run debug on page load
-document.addEventListener("DOMContentLoaded", debugInitialState)
-</script>
 </head>
 <body class="bg-gray-100 h-screen">
     <div id="app" class="h-full flex flex-col">
@@ -58,7 +45,7 @@ document.addEventListener("DOMContentLoaded", debugInitialState)
                 
                 <button 
                   id="start-button" 
-                  class="w-full py-2 px-4 rounded-md transition duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 enabled:bg-blue-500 enabled:text-white enabled:hover:bg-blue-600" 
+                  class="w-full py-2 px-4 rounded-md transition bg-gray-300 cursor-not-allowed text-gray-500" 
                   disabled
                   aria-describedby="button-status"
                 >
@@ -188,7 +175,6 @@ document.addEventListener("DOMContentLoaded", debugInitialState)
         </div>
     </div>
 
-    <script src="button-state-manager.js"></script>
     <script src="utils.js"></script>
     <script src="client.js"></script>
 </body>
