@@ -8,10 +8,10 @@
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-gray-100 h-screen">
+<body class="bg-gray-100 h-screen overflow-hidden">
     <div id="app" class="h-full flex flex-col">
         <!-- Welcome Screen -->
-        <div id="welcome-screen" class="flex flex-col items-center justify-center h-full">
+        <div id="welcome-screen" class="flex flex-col items-center justify-center h-full p-4">
             <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
                 <h1 class="text-3xl font-bold text-center mb-6">Safe Video Chat</h1>
                 <p class="mb-6 text-gray-600 text-center">Connect with others in a safe, moderated environment</p>
@@ -56,9 +56,9 @@
         </div>
 
         <!-- Chat Interface -->
-        <div id="chat-interface" class="hidden h-full flex flex-col">
+        <div id="chat-interface" class="hidden h-full flex flex-col overflow-hidden">
             <!-- Header -->
-            <header class="bg-white shadow-sm p-3 sm:p-4">
+            <header class="bg-white shadow-sm p-3 sm:p-4 flex-shrink-0">
                 <div class="container mx-auto flex justify-between items-center">
                     <h1 class="text-lg sm:text-xl font-bold">Safe Video Chat</h1>
                     <div class="flex items-center space-x-2 sm:space-x-4">
@@ -69,13 +69,13 @@
             </header>
 
             <!-- Main Content -->
-            <main class="flex-1 flex flex-col overflow-hidden">
-                <!-- Video Container -->
-                <div class="flex-1 flex flex-col lg:flex-row bg-gray-900 relative min-h-0">
-                    <!-- Videos Section -->
-                    <div id="videos-container" class="flex-1 flex flex-col relative min-h-0">
+            <main class="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+                <!-- Video Section -->
+                <div class="flex-1 flex flex-col bg-gray-900 relative min-h-0">
+                    <!-- Videos Container -->
+                    <div id="videos-container" class="flex-1 relative min-h-0">
                         <!-- Remote Video (Main) -->
-                        <div id="remote-video-container" class="flex-1 bg-black relative">
+                        <div id="remote-video-container" class="w-full h-full bg-black relative">
                             <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
                             <div id="waiting-message" class="absolute inset-0 flex items-center justify-center text-white text-lg px-4 text-center">
                                 Waiting for someone to connect...
@@ -86,85 +86,85 @@
                                 <video id="local-video" autoplay muted playsinline class="w-full h-full object-cover"></video>
                             </div>
                         </div>
-
-                        <!-- Video Controls -->
-                        <div class="bg-gray-800 p-3 sm:p-4">
-                            <div class="flex justify-center items-center space-x-2 sm:space-x-4">
-                                <button id="toggle-video" class="bg-gray-700 hover:bg-gray-600 text-white p-2 sm:p-3 rounded-full touch-manipulation">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                    </svg>
-                                </button>
-                                <button id="toggle-audio" class="bg-gray-700 hover:bg-gray-600 text-white p-2 sm:p-3 rounded-full touch-manipulation">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                                    </svg>
-                                </button>
-                                <button id="end-call" class="bg-red-600 hover:bg-red-700 text-white p-2 sm:p-3 rounded-full touch-manipulation">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
-                                    </svg>
-                                </button>
-                                <button id="toggle-chat" class="bg-blue-600 hover:bg-blue-700 text-white p-2 sm:p-3 rounded-full touch-manipulation lg:hidden">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a9.863 9.863 0 01-4.255-.949L5 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
-                                    </svg>
-                                </button>
-                                <div class="hidden sm:flex space-x-2">
-                                    <button id="report-user" class="bg-yellow-600 hover:bg-yellow-700 text-white p-2 sm:p-3 rounded-full touch-manipulation">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
-                                    </button>
-                                    <button id="block-user" class="bg-gray-700 hover:bg-gray-600 text-white p-2 sm:p-3 rounded-full touch-manipulation">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <!-- Mobile Action Buttons -->
-                            <div class="flex sm:hidden justify-center space-x-4 mt-3 pt-3 border-t border-gray-700">
-                                <button id="report-user-mobile" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md text-sm touch-manipulation">
-                                    Report
-                                </button>
-                                <button id="block-user-mobile" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm touch-manipulation">
-                                    Block
-                                </button>
-                            </div>
-                        </div>
                     </div>
 
-                    <!-- Chat Sidebar -->
-                    <div id="chat-sidebar" class="w-full lg:w-80 bg-white border-l border-gray-200 flex flex-col fixed lg:relative inset-0 lg:inset-auto z-20 transform translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
-                        <!-- Chat Header -->
-                        <div class="p-3 sm:p-4 border-b border-gray-200 flex justify-between items-center">
-                            <h2 class="text-lg font-semibold">Chat</h2>
-                            <button id="close-chat" class="lg:hidden text-gray-500 hover:text-gray-700 p-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    <!-- Video Controls -->
+                    <div class="bg-gray-800 p-3 sm:p-4 flex-shrink-0">
+                        <div class="flex justify-center items-center space-x-2 sm:space-x-4">
+                            <button id="toggle-video" class="bg-gray-700 hover:bg-gray-600 text-white p-2 sm:p-3 rounded-full touch-manipulation transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                 </svg>
                             </button>
+                            <button id="toggle-audio" class="bg-gray-700 hover:bg-gray-600 text-white p-2 sm:p-3 rounded-full touch-manipulation transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                </svg>
+                            </button>
+                            <button id="end-call" class="bg-red-600 hover:bg-red-700 text-white p-2 sm:p-3 rounded-full touch-manipulation transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
+                                </svg>
+                            </button>
+                            <button id="toggle-chat" class="bg-blue-600 hover:bg-blue-700 text-white p-2 sm:p-3 rounded-full touch-manipulation lg:hidden transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a9.863 9.863 0 01-4.255-.949L5 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
+                                </svg>
+                            </button>
+                            <div class="hidden sm:flex space-x-2">
+                                <button id="report-user" class="bg-yellow-600 hover:bg-yellow-700 text-white p-2 sm:p-3 rounded-full touch-manipulation transition">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </button>
+                                <button id="block-user" class="bg-gray-700 hover:bg-gray-600 text-white p-2 sm:p-3 rounded-full touch-manipulation transition">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         
-                        <!-- Messages -->
-                        <div id="messages" class="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 min-h-0"></div>
-                        
-                        <!-- Message Input -->
-                        <div class="p-3 sm:p-4 border-t border-gray-200">
-                            <form id="message-form" class="flex space-x-2">
-                                <input type="text" id="message-input" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Type a message...">
-                                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition text-sm sm:text-base touch-manipulation">Send</button>
-                            </form>
+                        <!-- Mobile Action Buttons -->
+                        <div class="flex sm:hidden justify-center space-x-4 mt-3 pt-3 border-t border-gray-700">
+                            <button id="report-user-mobile" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md text-sm touch-manipulation transition">
+                                Report
+                            </button>
+                            <button id="block-user-mobile" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm touch-manipulation transition">
+                                Block
+                            </button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Chat Sidebar -->
+                <div id="chat-sidebar" class="w-full lg:w-80 bg-white border-l border-gray-200 flex flex-col fixed lg:relative inset-0 lg:inset-auto z-20 transform translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+                    <!-- Chat Header -->
+                    <div class="p-3 sm:p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
+                        <h2 class="text-lg font-semibold">Chat</h2>
+                        <button id="close-chat" class="lg:hidden text-gray-500 hover:text-gray-700 p-1 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <!-- Messages -->
+                    <div id="messages" class="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 min-h-0"></div>
+                    
+                    <!-- Message Input -->
+                    <div class="p-3 sm:p-4 border-t border-gray-200 flex-shrink-0">
+                        <form id="message-form" class="flex space-x-2">
+                            <input type="text" id="message-input" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Type a message...">
+                            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition text-sm sm:text-base touch-manipulation">Send</button>
+                        </form>
                     </div>
                 </div>
             </main>
         </div>
 
         <!-- Modals -->
-        <div id="report-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div id="report-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
                 <h2 class="text-xl font-bold mb-4">Report User</h2>
                 <form id="report-form">
@@ -189,8 +189,8 @@
             </div>
         </div>
 
-        <!-- Notifications -->
-        <div id="notification" class="fixed top-4 right-4 max-w-xs bg-white shadow-lg rounded-lg p-4 hidden">
+        <!-- Notifications - Moved to bottom -->
+        <div id="notification" class="fixed bottom-4 right-4 max-w-xs bg-white shadow-lg rounded-lg p-4 hidden z-50">
             <div class="flex items-start">
                 <div id="notification-icon" class="flex-shrink-0 h-6 w-6 mr-3"></div>
                 <div class="flex-1">

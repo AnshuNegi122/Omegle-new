@@ -30,6 +30,12 @@ body {
   background: #000;
 }
 
+/* Ensure proper video sizing */
+#videos-container {
+  min-height: 0;
+  flex: 1;
+}
+
 /* Responsive video sizing */
 @media (max-width: 640px) {
   #local-video-container {
@@ -123,11 +129,11 @@ body {
   }
 }
 
-/* Notifications */
+/* Notifications - Now at bottom */
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -143,8 +149,7 @@ body {
 #notification {
   max-width: 90vw;
   right: 1rem;
-  top: 1rem;
-  z-index: 10;
+  bottom: 1rem;
 }
 
 @media (min-width: 640px) {
@@ -295,4 +300,57 @@ textarea:focus {
     background-color: #1f2937;
     color: #f9fafb;
   }
+}
+
+/* Laptop specific fixes */
+@media (min-width: 1024px) {
+  /* Ensure proper height distribution */
+  #chat-interface {
+    height: 100vh;
+  }
+
+  main {
+    height: calc(100vh - 80px); /* Subtract header height */
+  }
+
+  #videos-container {
+    height: calc(100% - 80px); /* Subtract controls height */
+  }
+
+  /* Ensure chat sidebar takes proper height */
+  #chat-sidebar {
+    height: 100%;
+  }
+
+  /* Better control button sizing for laptops */
+  .bg-gray-800 button {
+    padding: 0.75rem;
+  }
+
+  .bg-gray-800 svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+/* Fix for very large screens */
+@media (min-width: 1440px) {
+  #local-video-container {
+    width: 200px !important;
+    height: 250px !important;
+  }
+}
+
+/* Ensure no overflow issues */
+.overflow-hidden {
+  overflow: hidden !important;
+}
+
+/* Fix flex issues */
+.min-h-0 {
+  min-height: 0 !important;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0 !important;
 }
